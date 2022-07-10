@@ -6,12 +6,10 @@
 const ASSET_URL = 'https://hunshcn.github.io/gh-proxy/'
 // 前缀，如果自定义路由为example.com/gh/*，将PREFIX改为 '/gh/'，注意，少一个杠都会错！
 const PREFIX = '/'
-// 分支文件使用jsDelivr镜像的开关，0为关闭，默认关闭
+// 分支文件使用jsDelivr镜像的开关，0为关闭，默认开启
 const Config = {
-    jsdelivr: 0
+    jsdelivr: 1
 }
-
-const whiteList = [] // 白名单，路径里面有包含字符的才会通过，e.g. ['/username/']
 
 /** @type {RequestInit} */
 const PREFLIGHT_INIT = {
@@ -25,12 +23,13 @@ const PREFLIGHT_INIT = {
 
 
 const exp1 = /^(?:https?:\/\/)?github\.com\/.+?\/.+?\/(?:releases|archive)\/.*$/i
-const exp2 = /^(?:https?:\/\/)?github\.com\/.+?\/.+?\/(?:blob|raw)\/.*$/i
+const exp2 = /^(?:https?:\/\/)?github\.com\/.+?\/.+?\/(?:blob|raw)\/.*$/i  
 const exp3 = /^(?:https?:\/\/)?github\.com\/.+?\/.+?\/(?:info|git-).*$/i
 const exp4 = /^(?:https?:\/\/)?raw\.(?:githubusercontent|github)\.com\/.+?\/.+?\/.+?\/.+$/i
 const exp5 = /^(?:https?:\/\/)?gist\.(?:githubusercontent|github)\.com\/.+?\/.+?\/.+$/i
 const exp6 = /^(?:https?:\/\/)?github\.com\/.+?\/.+?\/tags.*$/i
 
+const exp8 = /^(?:https?:\/\/)?(?:githubusercontent|github|gh)\/.+?\/.+?\/.+?\/.+$/i
 /**
  * @param {any} body
  * @param {number} status
@@ -62,7 +61,7 @@ addEventListener('fetch', e => {
 
 
 function checkUrl(u) {
-    for (let i of [exp1, exp2, exp3, exp4, exp5, exp6]) {
+    for (let i of [exp1, exp2, exp3, exp4, exp5, exp6, exp8]) {
         if (u.search(i) === 0) {
             return true
         }
@@ -96,6 +95,9 @@ async function fetchHandler(e) {
     } else if (path.search(exp4) === 0) {
         const newUrl = path.replace(/(?<=com\/.+?\/.+?)\/(.+?\/)/, '@$1').replace(/^(?:https?:\/\/)?raw\.(?:githubusercontent|github)\.com/, 'https://cdn.jsdelivr.net/gh')
         return Response.redirect(newUrl, 302)
+    } else if (path.search(exp8) === 0){
+        const newUrl = path.replace("gh","https://raw.githubusercontent.com")
+        return httpHandler(req, newUrl)
     } else {
         return fetch(ASSET_URL + path)
     }
@@ -119,16 +121,6 @@ function httpHandler(req, pathname) {
     const reqHdrNew = new Headers(reqHdrRaw)
 
     let urlStr = pathname
-    let flag = false
-    for (let i of whiteList) {
-        if (urlStr.includes(i)) {
-            flag = true
-            break
-        }
-    }
-    if (!flag) {
-        return new Response("blocked", {status: 403})
-    }
     if (urlStr.startsWith('github')) {
         urlStr = 'https://' + urlStr
     }
@@ -178,4 +170,3 @@ async function proxy(urlObj, reqInit) {
         headers: resHdrNew,
     })
 }
-
